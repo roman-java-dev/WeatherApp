@@ -29,15 +29,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final SenderService senderService;
     @Value("${api.subject.message}")
     private String subjectMessage;
-    @Value("${api.body.message}")
-    private String bodyMessage;
     @Value("${api.verification.url}")
     private String verificationUrl;
 
-
-    public User register(UserRegisterDto dto) {
-        User user = mapper.convertValue(dto, User.class);
-        user.setPassword(passwordEncoder.encode(dto.getPassword()));
+    public User register(UserRegisterDto registerDto) {
+        User user = mapper.convertValue(registerDto, User.class);
+        user.setPassword(passwordEncoder.encode(registerDto.getPassword()));
         user.setAccountVerified(false);
         user.setVerificationCode(passwordEncoder.encode(getRandomCode()));
         sendMessage(user);
@@ -87,8 +84,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 emailContent
         );
     }
-
-
 
     private String getRandomCode() {
         StringBuilder codeBuilder = new StringBuilder();

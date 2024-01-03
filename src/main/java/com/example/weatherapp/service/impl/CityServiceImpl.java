@@ -32,7 +32,7 @@ public class CityServiceImpl implements CityService {
         );
     }
 
-    private String formatUrl(String urlCity, String latitude, String longitude) {
+    public String formatUrl(String urlCity, String latitude, String longitude) {
         return urlCity.replaceFirst(defaultLonMin, String.valueOf(Double.parseDouble(longitude) - OVERSIGHT))
                 .replaceFirst(defaultLatMin, String.valueOf(Double.parseDouble(latitude) - OVERSIGHT))
                 .replaceFirst(defaultLon, String.valueOf(Double.parseDouble(longitude) + OVERSIGHT))

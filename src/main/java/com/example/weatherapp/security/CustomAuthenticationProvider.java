@@ -25,6 +25,7 @@ public class CustomAuthenticationProvider extends DaoAuthenticationProvider {
     protected void additionalAuthenticationChecks(UserDetails userDetails,
                                                   UsernamePasswordAuthenticationToken authentication) throws AuthenticationException {
         super.additionalAuthenticationChecks(userDetails, authentication);
+        System.out.println(authentication.toString());
         service.login(authentication.getPrincipal().toString(), authentication.getCredentials().toString());
     }
 }
