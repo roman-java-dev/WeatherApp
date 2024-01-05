@@ -4,7 +4,6 @@ import com.example.weatherapp.dto.UserLoginDto;
 import com.example.weatherapp.dto.UserRegisterDto;
 import com.example.weatherapp.service.AuthenticationService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -12,13 +11,18 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 @Controller
-@RequiredArgsConstructor
 public class AuthenticationController {
-    @Value("${api.default.url}")
-    private String mainPageUrl;
-    @Value("${api.mail.url}")
-    private String mailUrl;
+    private final String mainPageUrl;
+    private final String mailUrl;
     private final AuthenticationService authService;
+
+    public AuthenticationController(@Value("${api.default.url}") String mainPageUrl,
+                                    @Value("${api.mail.url}") String mailUrl,
+                                    AuthenticationService authService) {
+        this.mainPageUrl = mainPageUrl;
+        this.mailUrl = mailUrl;
+        this.authService = authService;
+    }
 
     @GetMapping("/login")
     public String loginForm(Model model) {
@@ -33,7 +37,7 @@ public class AuthenticationController {
     }
 
     @PostMapping("/register")
-    public String registerProcessForm( @Valid UserRegisterDto dto,
+    public String registerProcessForm(@Valid UserRegisterDto dto,
                                       BindingResult result, Model model) {
         if (result.hasErrors()) {
             model.addAttribute("userRegisterDto", dto);

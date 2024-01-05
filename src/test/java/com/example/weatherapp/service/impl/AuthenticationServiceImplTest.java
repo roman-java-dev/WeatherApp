@@ -1,10 +1,11 @@
 package com.example.weatherapp.service.impl;
 
 import com.example.weatherapp.dto.UserRegisterDto;
+import com.example.weatherapp.exception.CustomDataValidationException;
 import com.example.weatherapp.model.User;
-import com.example.weatherapp.service.SenderService;
 import com.example.weatherapp.service.UserService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.weatherapp.service.VerificationFormSender;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -12,68 +13,108 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class AuthenticationServiceImplTest {
-
     @Mock
     private PasswordEncoder passwordEncoder;
-
     @Mock
     private UserService userService;
-
     @Mock
-    private SenderService senderService;
-
+    private VerificationFormSender sender;
     @InjectMocks
     private AuthenticationServiceImpl authenticationService;
+    private List<UserRegisterDto> validUsers;
+    private List<UserRegisterDto> invalidFirstName;
+    private List<UserRegisterDto> invalidLastName;
+    private List<UserRegisterDto> invalidEmail;
+    private List<UserRegisterDto> invalidPassword;
+    private List<UserRegisterDto> dataIsEmpty;
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.initMocks(this);
-        ReflectionTestUtils.setField(authenticationService, "mapper", new ObjectMapper());
-        ReflectionTestUtils.setField(authenticationService, "verificationUrl", "http://localhost:8091/verified?code=%s");
-        ReflectionTestUtils.setField(authenticationService,"templateEngine", templateEngine());
-        ReflectionTestUtils.setField(authenticationService, "subjectMessage", "Registration confirmation");
+        MockitoAnnotations.openMocks(this);
+        validUsers = TestDataProvider.getValidUsers();
+        invalidFirstName = TestDataProvider.getUserWithInvalidFirstName();
+        invalidLastName = TestDataProvider.getUserWithInvalidLastName();
+        invalidEmail = TestDataProvider.getUserWithInvalidEmail();
+        invalidPassword = TestDataProvider.getUserWithInvalidPassword();
+        dataIsEmpty = TestDataProvider.getUserWithDataIsEmpty();
     }
 
     @Test
-    void testRegister() {
-        UserRegisterDto registerDto = new UserRegisterDto();
-        registerDto.setFirstName("Test");
-        registerDto.setLastName("Test-Test");
-        registerDto.setEmail("test@example.com");
-        registerDto.setPassword("password");
-
-        User user = new User();
-        user.setFirstName(registerDto.getFirstName());
-        user.setLastName(registerDto.getLastName());
-        user.setEmail(registerDto.getEmail());
-        user.setPassword(registerDto.getPassword());
-        user.setAccountVerified(false);
-
-        Context context = new Context();
-        context.setVariable("user", user);
+    void register_ok() {
         when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
-        when(userService.add(any(User.class))).thenReturn(user);
 
+        when(userService.add(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        User registeredUser = authenticationService.register(registerDto);
+        List<User> registeredUsers = validUsers.stream()
+                .map(user -> authenticationService.register(user))
+                .toList();
 
-        assertNotNull(registeredUser);
-        assertEquals(registerDto.getEmail(), registeredUser.getEmail());
-        assertFalse(registeredUser.isAccountVerified());
-        verify(passwordEncoder, times(1)).encode(eq(registerDto.getPassword()));
-        verify(userService, times(1)).add(any(User.class));
-        verify(senderService, times(1)).sendMessage(anyString(), anyString(), anyString());
+        registeredUsers.forEach(Assertions::assertNotNull);
+        registeredUsers.forEach(user -> assertFalse(user.isAccountVerified()));
+
+        validUsers.forEach(user -> {
+            verify(passwordEncoder).encode(user.getPassword());
+            verify(passwordEncoder, times(validUsers.size() * 2)).encode(anyString());
+        });
+
+        registeredUsers.forEach(user -> {
+            verify(userService, times(validUsers.size())).add(any(User.class));
+            verify(sender, times(validUsers.size())).sendMessage(any(User.class));
+        });
+    }
+
+    @Test
+    void register_invalidCredentials() {
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
+
+        when(userService.add(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        invalidFirstName.forEach(user -> {
+            CustomDataValidationException exception = assertThrows(CustomDataValidationException.class,
+                    () -> authenticationService.register(user));
+            assertEquals("Invalid firstName. It should consist only of alphabet characters and of 2 to 6 characters - "
+                    + user.getFirstName(), exception.getMessage());
+        });
+
+        invalidLastName.forEach(user ->{
+            CustomDataValidationException exception = assertThrows(CustomDataValidationException.class,
+                    () -> authenticationService.register(user));
+            assertEquals("Invalid lastName. It should consist only of alphabet characters and of 2 to 6 characters - "
+                    + user.getLastName(), exception.getMessage());
+        });
+
+        invalidEmail.forEach(user -> {
+            CustomDataValidationException exception = assertThrows(CustomDataValidationException.class,
+                    () -> authenticationService.register(user));
+            assertEquals("Invalid email: " + user.getEmail(), exception.getMessage());
+        });
+
+        invalidPassword.forEach(user -> {
+            CustomDataValidationException exception = assertThrows(CustomDataValidationException.class,
+                    () -> authenticationService.register(user));
+            assertEquals("Invalid password! The password requires at least one lowercase character, one "
+                    + "uppercase character, one number, and at least one special character. "
+                            + "The password should consist of 8 to 20 characters " + user.getPassword(),
+                    exception.getMessage());
+        });
+
+        dataIsEmpty.forEach(user -> {
+            CustomDataValidationException exception = assertThrows(CustomDataValidationException.class,
+                    () -> authenticationService.register(user));
+            assertEquals("None of the fields should be empty",
+                    exception.getMessage());
+        });
+
     }
 
     @Test
